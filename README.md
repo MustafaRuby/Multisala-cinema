@@ -10,7 +10,7 @@ Questo progetto è un'applicazione web per la gestione di una multisala cinemato
 ## Installazione
 1. Clona il repository:
     ```bash
-    git clone <[Multisala-Cinema](https://github.com/MustafaRuby/Multisala-cinema.git)>
+    git clone https://github.com/MustafaRuby/Multisala-cinema.git
     ```
 2. Naviga nella directory del progetto:
     ```bash
