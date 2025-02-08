@@ -1,4 +1,4 @@
-# Multisala OZ
+# Multisala Cinema
 
 ## Descrizione
 Questo progetto è un'applicazione web per la gestione di una multisala cinematografica. Gli utenti possono registrarsi, effettuare il login e prenotare posti per le proiezioni.
@@ -14,7 +14,7 @@ Questo progetto è un'applicazione web per la gestione di una multisala cinemato
     ```
 2. Naviga nella directory del progetto:
     ```bash
-    cd Multisala oz
+    cd Multisala-cinema
     ```
 3. Installa le dipendenze:
     ```bash
