@@ -1,0 +1,12 @@
+// 7 Principali Metodi
+// run: Esegue una query SQL senza output (ad esempio, per creare o modificare tabelle).
+// all: Recupera tutte le righe che corrispondono alla query SQL.
+// get: Recupera la prima riga che corrisponde alla query SQL.
+// close: Chiude la connessione al database.
+
+// each: Esegue una funzione callback su ogni riga dei risultati della query.
+// prepare: Prepara una query SQL per l'esecuzione multipla con parametri.
+
+// serialize: evita conflitti dovuti ad accessi multipli al DB
+
+// Crea una tabella chiamata "studenti"

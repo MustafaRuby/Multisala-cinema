@@ -1,0 +1,123 @@
+doctype html
+html(lang="it")
+  head
+    meta(charset="UTF-8")
+    meta(name="viewport" content="width=device-width, initial-scale=1.0")
+    title Main area
+    style.
+      body {
+        font-family: Arial, sans-serif;
+        background-color:rgb(208, 208, 208);
+        margin: 0;
+        padding: 0;
+      }
+      .container {
+        border-radius: 5px;
+        text-align: center;
+        margin: auto;
+        padding: 10px;
+        width: 700px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        background-color: #fff;
+      }
+      .seat-container {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        margin: 20px 0;
+      }
+      .seat {
+        width: 70px;
+        height: 90px;
+        margin: 5px;
+        background-color: #800080;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 5px;
+        cursor: pointer;
+        position: relative;
+      }
+      .seat.booked {
+        background-color: #808080;
+      }
+
+      .seat.booked:hover {
+        background-color:rgb(44, 44, 44);
+      }
+      .seat:hover {
+        background-color: #9932CC;
+      }
+      .button {
+        cursor: pointer;
+        padding: 10px 20px;
+        background-color: #800080;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        text-decoration: none;
+      }
+      .button:hover {
+        background-color: #9932CC;
+      }
+      .row {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 10px;
+      }
+      .spacer {
+        width: 20px;
+      }
+      .seat button {
+        position: absolute;
+        bottom: 5px;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: #DA70D6;
+        border: none;
+        color: white;
+        padding: 5px;
+        border-radius: 3px;
+        cursor: pointer;
+      }
+      .seat.booked button {
+        display: none;
+      }
+      .seat button:hover {
+        background-color: #BA55D3;
+      }
+  body(style="padding: 20px;")
+    div.container(style="padding: 20px;")
+      h1= titolo1
+      h2= subtitolo1
+      p
+        | Lorem ipsum dolor, sit amet consectetur adipisicing elit. Ab voluptatem doloremque et saepe fugiat quaerat corporis quos recusandae non cumque, odit quibusdam 
+        | fugit perferendis consectetur voluptas amet repellendus porro ipsam.
+      hr
+      h2= subtitolo2
+      h2 Benvenuto, #{profilo.nominativo}
+
+      div.seat-container
+        each row in ['A', 'B', 'C', 'D', 'E', 'F', 'G']
+          div.row
+            each col in [1, 2, 3, 4]
+              - const posto = posti.find(p => p.numero === `${row}${col}`)
+              div(class=`seat ${posto && posto.prenotato ? 'booked' : ''}`)
+                if posto && !posto.prenotato
+                  form(action="/prenota" method="POST")
+                    input(type="hidden" name="id_posto" value=`${posto.id}`)
+                    button(style="margin-top: 20px;") Prenota
+                | #{row}#{col}
+            div.spacer
+            each col in [5, 6, 7, 8]
+              - const posto = posti.find(p => p.numero === `${row}${col}`)
+              div(class=`seat ${posto && posto.prenotato ? 'booked' : ''}`)
+                if posto && !posto.prenotato
+                  form(action="/prenota" method="POST")
+                    input(type="hidden" name="id_posto" value=`${posto.id}`)
+                    button(style="margin-top: 20px;") Prenota
+                | #{row}#{col}
+
+      br
+      a(href="/" class="button") Logout
