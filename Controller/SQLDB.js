@@ -55,6 +55,28 @@ function creaDB() {
                 }
             });
 
+            db.run(`CREATE TABLE IF NOT EXISTS amministratori(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nome TEXT NOT NULL,
+                password TEXT NOT NULL
+            );`, (err) => {
+                if (err) {
+                    console.log(err.message);
+                    reject(err);
+                } else {
+                    console.log("Tabella 'amministratori' creata.");
+                    db.run(`INSERT INTO amministratori (nome, password) VALUES ('Mostafa', 'passw0rd');`, (err) => {
+                        if (err) {
+                            console.log(err.message);
+                            reject(err);
+                        } else {
+                            console.log("Record amministratore inserito.");
+                            resolve();
+                        }
+                    });
+                }
+            });
+
             const posti = [];
             ['A', 'B', 'C', 'D', 'E', 'F', 'G'].forEach(row => {
                 [1, 2, 3, 4, 5, 6, 7, 8].forEach(col => {
@@ -115,18 +137,6 @@ function cercaProfiloEmail(email) {
     });
 }
 
-function eliminaProfilo(idEliminare) {
-    return new Promise((resolve, reject) => {
-        db.run(`DELETE FROM profili WHERE id = ?;`, [idEliminare], function (err) {
-            if (err) {
-                reject(err);
-            } else {
-                resolve();
-            }
-        });
-    });
-}
-
 function listaPosti() {
     return new Promise((resolve, reject) => {
         db.all(`SELECT * FROM posti;`, [], (err, rows) => {
@@ -139,7 +149,7 @@ function listaPosti() {
     });
 }
 
-function prenotaPosto(id_profilo, id_posto) {
+function prenotaPosto(id_profilo, id_posto, nome_admin) {
     return new Promise((resolve, reject) => {
         db.get(`SELECT * FROM prenotazioni WHERE id_posto = ?;`, [id_posto], (err, row) => {
             if (err) {
@@ -147,13 +157,23 @@ function prenotaPosto(id_profilo, id_posto) {
             } else if (row) {
                 reject(new Error('Posto già prenotato'));
             } else {
-                db.run(`INSERT INTO prenotazioni (id_profilo, id_posto) VALUES (?, ?);`, [id_profilo, id_posto], (err) => {
-                    if (err) {
-                        reject(err);
-                    } else {
-                        resolve();
-                    }
-                });
+                if (id_profilo) {
+                    db.run(`INSERT INTO prenotazioni (id_profilo, id_posto) VALUES (?, ?);`, [id_profilo, id_posto], (err) => {
+                        if (err) {
+                            reject(err);
+                        } else {
+                            resolve();
+                        }
+                    });
+                } else if (nome_admin) {
+                    db.run(`INSERT INTO prenotazioni (id_profilo, id_posto) VALUES ((SELECT nome FROM amministratori WHERE nome = ?), ?);`, [nome_admin, id_posto], (err) => {
+                        if (err) {
+                            reject(err);
+                        } else {
+                            resolve();
+                        }
+                    });
+                }
             }
         });
     });
@@ -171,31 +191,42 @@ function listaPrenotazioni() {
     });
 }
 
-// Elimina il database
-function eliminaDB () {
+function eliminaPrenotazione(id_profilo, id_posto, nome_admin) {
     return new Promise((resolve, reject) => {
-        db.run(`DROP TABLE IF EXISTS profili;`, (err) => {
-            if (err) {
-                console.error('Errore durante la cancellazione del DB:', err.message);
-            } else {
-                console.log('DB eliminato');
-            }
-        });
+        if(!nome_admin){
+            console.log(id_profilo, id_posto);
+            db.run(`DELETE FROM prenotazioni WHERE id_profilo = ? AND id_posto = ?;`, [id_profilo, id_posto], function (err) {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve();
+                }
+            });
+        }
+        else{
+            db.run(`DELETE FROM prenotazioni WHERE id_posto = ? AND ? IN (SELECT amministratori.nome FROM amministratori);`, [id_posto, nome_admin], function (err) {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve();
+                }
+            });
+        }
+        
     });
-};
+}
 
-// Chiude il database
-function chiudiDB () {
+function cercaAmministratore(nome, password) {
     return new Promise((resolve, reject) => {
-        db.close((err) => {
+        db.get(`SELECT * FROM amministratori WHERE nome = ? AND password = ?`, [nome, password], (err, row) => {
             if (err) {
-                console.error('Errore durante la chiusura del database:', err.message);
+                reject(err);
             } else {
-                console.log('Connessione al database chiusa.');
+                resolve(row);
             }
         });
     });
-};
+}
 
 // Esportare le funzioni
 module.exports = {
@@ -203,10 +234,9 @@ module.exports = {
     inserisciProfilo,
     listaProfili,
     cercaProfiloEmail,
-    eliminaProfilo,
-    eliminaDB,
-    chiudiDB,
     listaPosti,
     prenotaPosto,
-    listaPrenotazioni
+    listaPrenotazioni,
+    cercaAmministratore,
+    eliminaPrenotazione
 };

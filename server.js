@@ -20,7 +20,6 @@ serverAbou.use(session({
     saveUninitialized: true,
     cookie: { secure: false }  // Impostare 'true' se usi HTTPS
 }));
-  
 
 // Impostare la cartella dove si trova il file da renderizzare
 serverAbou.set('views', __dirname + '/Views');
@@ -41,6 +40,7 @@ serverAbou.get('/', (req, res) => {
 
 serverAbou.get('/register', (req, res) => {
     res.sendFile(__dirname + '/Public/register.html');
+    req.session.user = "";
 });
 
 serverAbou.get('/errlogin', (req, res) => {
@@ -62,11 +62,9 @@ serverAbou.post('/register', async (req, res) => {
 
         const profili = await controller.listaProfili();
 
-        for (const profilo of profili) {
-            if (profilo.email === nuovoProfilo.email) {
-                res.redirect('/errregister');
-                return;
-            }
+        if (profili.some(profilo => profilo.email === nuovoProfilo.email)) {
+            res.redirect('/errregister');
+            return;
         }
 
         await controller.inserisciProfilo(nuovoProfilo.email, nuovoProfilo.password, nuovoProfilo.nominativo, nuovoProfilo.genere);
@@ -80,65 +78,82 @@ serverAbou.post('/register', async (req, res) => {
 
 serverAbou.get('/login', (req, res) => {
     res.sendFile(__dirname + '/Public/login.html');
+    req.session.user = "";
 });
 
 serverAbou.post('/login', async (req, res) => {
     try {
-        const nuovoProfilo = {
-            email: req.body.GMLInoltrato,
-            password: req.body.PSWRDInoltrato,
-        };
-
+        const { GMLInoltrato: email, PSWRDInoltrato: password } = req.body;
         const profili = await controller.listaProfili();
 
-        for (const profilo of profili) {
-            if (profilo.email === nuovoProfilo.email) {
-                if (profilo.password === nuovoProfilo.password) {
-                    req.session.user = nuovoProfilo.email;
-                    res.redirect('/sala');
-                    return;
-                } else {
-                    res.redirect('/errlogin');
-                    return;
-                }
-            }
+        const profilo = profili.find(profilo => profilo.email === email);
+
+        if (profilo && profilo.password === password) {
+            req.session.user = email;
+            res.redirect('/sala');
+        } else {
+            res.redirect('/errlogin');
         }
-        res.redirect('/errlogin');
     } catch (err) {
         console.error('Errore durante il login:', err.message);
         res.redirect('/errlogin');
     }
 });
 
-// Si crea l'endpoint della pagina renderizzata
+serverAbou.get('/napafini', (req, res) => {
+    res.sendFile(__dirname + '/Public/adminLog.html');
+    req.session.user = "";
+});
+
+serverAbou.post('/adminLogin', async (req, res) => {
+    try {
+        const { nome, password } = req.body;
+        const admin = await controller.cercaAmministratore(nome, password);
+
+        if (admin) {
+            req.session.admin = admin.nome;
+            res.redirect('/sala');
+        } else {
+            res.status(401).send('Nome o password non validi');
+        }
+    } catch (err) {
+        console.error('Errore durante il login admin:', err.message);
+        res.status(500).send('Errore interno del server');
+    }
+});
+
 serverAbou.get('/sala', async (req, res) => {
     try {
-        const titolo_1 = 'Sala principale';
-        const subtitolo_1 = 'Informazioni sulla nostra app';
-        const subtitolo_2 = 'Posti';
-        const profili = await controller.cercaProfiloEmail(req.session.user);
-        const posti = await controller.listaPosti();
-
-        const prenotazioni = await controller.listaPrenotazioni();
-        const postiPrenotati = prenotazioni.map(p => p.id_posto);
-
-        const postiConPrenotazione = posti.map(posto => ({
-            ...posto,
-            prenotato: postiPrenotati.includes(posto.id)
-        }));
-
-        if (profili.length > 0) {
-            const profilo = profili[0];
-            res.render('sala', {
-                titolo1: titolo_1,
-                subtitolo1: subtitolo_1,
-                subtitolo2: subtitolo_2,
-                profilo: profilo,
-                posti: postiConPrenotazione
-            });
-        } else {
-            res.status(404).send('Profilo non trovato');
+        let profilo;
+        if (req.session.user) {
+            profilo = (await controller.cercaProfiloEmail(req.session.user))[0];
+        } else if (req.session.admin) {
+            profilo = { nominativo: req.session.admin, isAdmin: true };
         }
+
+        if (!profilo) {
+            return res.status(404).send('Profilo non trovato');
+        }
+
+        const posti = await controller.listaPosti();
+        const prenotazioni = await controller.listaPrenotazioni();
+
+        const postiConPrenotazione = posti.map(posto => {
+            const prenotazione = prenotazioni.find(p => p.id_posto === posto.id);
+            return {
+                ...posto,
+                prenotato: !!prenotazione,
+                id_profilo: prenotazione ? prenotazione.id_profilo : null,
+            };
+        });
+
+        res.render('sala', {
+            titolo1: 'Sala principale',
+            subtitolo1: 'Informazioni sulla nostra app',
+            subtitolo2: 'Posti',
+            profilo,
+            posti: postiConPrenotazione
+        });
     } catch (err) {
         console.error('Errore durante il rendering della sala:', err.message);
         res.status(500).send('Errore interno del server');
@@ -147,14 +162,55 @@ serverAbou.get('/sala', async (req, res) => {
 
 serverAbou.post('/prenota', async (req, res) => {
     try {
-        const id_profilo = req.session.user;
+        let id_profilo;
+        let nome_admin;
+
+        if (req.session.user) {
+            const profili = await controller.cercaProfiloEmail(req.session.user);
+            id_profilo = profili[0].id;
+        } else if (req.session.admin) {
+            nome_admin = req.session.admin;
+        }
+
         const id_posto = req.body.id_posto;
 
-        await controller.prenotaPosto(id_profilo, id_posto);
+        if (id_profilo) {
+            await controller.prenotaPosto(id_profilo, id_posto);
+        } else if (nome_admin) {
+            await controller.prenotaPosto(null, id_posto, nome_admin);
+        }
+
         res.redirect('/sala');
     } catch (err) {
         console.error('Errore durante la prenotazione:', err.message);
         res.status(500).send('Errore durante la prenotazione');
+    }
+});
+
+serverAbou.post('/eliminaPrenotazione', async (req, res) => {
+    try {
+        const id_posto = req.body.id_posto;
+        let profilo;
+
+        if (req.session.user) {
+            const profili = await controller.cercaProfiloEmail(req.session.user);
+            profilo = profili[0];
+        } else if (req.session.admin) {
+            profilo = { isAdmin: true };
+        }
+        const nome_admin = req.session.admin;
+        if (profilo.isAdmin) {
+            await controller.eliminaPrenotazione(null, id_posto, nome_admin);
+            res.redirect('/sala');
+        } else if (profilo) {
+            await controller.eliminaPrenotazione(profilo.id, id_posto, null);
+            res.redirect('/sala');
+        } else {
+            res.status(404).send('Profilo non trovato');
+        }
+    } catch (err) {
+        console.error('Errore durante l\'eliminazione della prenotazione:', err.message);
+        res.status(500).send('Errore interno del server');
     }
 });
 

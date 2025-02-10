@@ -42,7 +42,6 @@ html(lang="it")
       .seat.booked {
         background-color: #808080;
       }
-
       .seat.booked:hover {
         background-color:rgb(44, 44, 44);
       }
@@ -87,6 +86,25 @@ html(lang="it")
       .seat button:hover {
         background-color: #BA55D3;
       }
+      .seat .cancel-button {
+        display: block;
+        background-color: red;
+        position: absolute;
+        bottom: 5px;
+        left: 50%;
+        transform: translateX(-50%);
+        border: none;
+        color: white;
+        padding: 5px;
+        border-radius: 3px;
+        cursor: pointer;
+      }
+      .seat .cancel-button:hover {
+        background-color: darkred;
+      }
+      .seat.booked .cancel-button {
+        display: block;
+      }
   body(style="padding: 20px;")
     div.container(style="padding: 20px;")
       h1= titolo1
@@ -98,22 +116,34 @@ html(lang="it")
       h2= subtitolo2
       h2 Benvenuto, #{profilo.nominativo}
 
-      div.seat-container
+      .seat-container
         each row in ['A', 'B', 'C', 'D', 'E', 'F', 'G']
-          div.row
+          .row
             each col in [1, 2, 3, 4]
               - const posto = posti.find(p => p.numero === `${row}${col}`)
-              div(class=`seat ${posto && posto.prenotato ? 'booked' : ''}`)
-                if posto && !posto.prenotato
+              .seat(class=`${posto && posto.prenotato ? 'booked' : ''}`)
+                if posto && posto.prenotato && (posto.id_profilo === profilo.id || profilo.isAdmin)
+                  form(action="/eliminaPrenotazione" method="POST")
+                    input(type="hidden" name="id_posto" value=`${posto.id}`)
+                    button.cancel-button(style="margin-top: 20px;") Annulla
+                
+                else if posto && !posto.prenotato
                   form(action="/prenota" method="POST")
                     input(type="hidden" name="id_posto" value=`${posto.id}`)
                     button(style="margin-top: 20px;") Prenota
                 | #{row}#{col}
-            div.spacer
+
+            .spacer
+
             each col in [5, 6, 7, 8]
               - const posto = posti.find(p => p.numero === `${row}${col}`)
-              div(class=`seat ${posto && posto.prenotato ? 'booked' : ''}`)
-                if posto && !posto.prenotato
+              .seat(class=`${posto && posto.prenotato ? 'booked' : ''}`)
+                if posto && posto.prenotato && (posto.id_profilo === profilo.id || profilo.isAdmin)
+                  form(action="/eliminaPrenotazione" method="POST")
+                    input(type="hidden" name="id_posto" value=`${posto.id}`)
+                    button.cancel-button(style="margin-top: 20px;") Annulla
+                
+                else if posto && !posto.prenotato
                   form(action="/prenota" method="POST")
                     input(type="hidden" name="id_posto" value=`${posto.id}`)
                     button(style="margin-top: 20px;") Prenota
