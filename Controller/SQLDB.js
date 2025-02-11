@@ -228,6 +228,22 @@ function cercaAmministratore(nome, password) {
     });
 }
 
+function registraAdmin(nome, password) {
+    return new Promise((resolve, reject) => {
+        db.run(`INSERT INTO amministratori (nome, password) VALUES (?, ?);`,
+            [nome, password],
+            function (err) {
+                if (err) {
+                    console.log(err.message);
+                    reject(err);
+                } else {
+                    console.log(`Nuovo admin registrato con ID ${this.lastID}`);
+                    resolve(this.lastID);
+                }
+            });
+    });
+}
+
 // Esportare le funzioni
 module.exports = {
     creaDB,
@@ -238,5 +254,6 @@ module.exports = {
     prenotaPosto,
     listaPrenotazioni,
     cercaAmministratore,
-    eliminaPrenotazione
+    eliminaPrenotazione,
+    registraAdmin
 };

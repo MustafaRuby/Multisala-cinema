@@ -112,6 +112,13 @@ html(lang="it")
       p
         | Lorem ipsum dolor, sit amet consectetur adipisicing elit. Ab voluptatem doloremque et saepe fugiat quaerat corporis quos recusandae non cumque, odit quibusdam 
         | fugit perferendis consectetur voluptas amet repellendus porro ipsam.
+      
+      if profilo.isAdmin
+        span(style="margin: 0 10px")
+        a(href="/adminReg" class="button") Registra Admin
+        br 
+        br
+      
       hr
       h2= subtitolo2
       h2 Benvenuto, #{profilo.nominativo}
@@ -151,3 +158,4 @@ html(lang="it")
 
       br
       a(href="/" class="button") Logout
+

@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const express = require('express');
-const session = require('express-session');
+const jwt = require('jsonwebtoken');
+const cookieParser = require('cookie-parser'); // Aggiungi questa riga
 const serverAbou = express();
 
 // Esempio di database di profili
@@ -13,16 +14,11 @@ serverAbou.set('view engine', 'pug');
 // Generare una chiave segreta randomizzata di 10 caratteri
 const secretKey = crypto.randomBytes(10).toString('hex');
 
-// Middleware per la gestione delle sessioni
-serverAbou.use(session({
-    secret: secretKey,  // Una chiave segreta randomizzata
-    resave: false,
-    saveUninitialized: true,
-    cookie: { secure: false }  // Impostare 'true' se usi HTTPS
-}));
+// Middleware per analizzare i dati dal form
+serverAbou.use(express.urlencoded({extended:true}));
 
-// Impostare la cartella dove si trova il file da renderizzare
-serverAbou.set('views', __dirname + '/Views');
+// Aggiungi il middleware cookie-parser
+serverAbou.use(cookieParser());
 
 // Middleware: log delle richieste
 serverAbou.use((req, res, next) => {
@@ -30,17 +26,27 @@ serverAbou.use((req, res, next) => {
     next();
 });
 
-// Middleware per analizzare i dati dal form
-serverAbou.use(express.urlencoded({extended:true}));
+// Middleware per verificare il token JWT
+function authenticateToken(req, res, next) {
+    const token = req.cookies.jwt;
+    if (!token) return res.redirect('/login');
+
+    jwt.verify(token, secretKey, (err, user) => {
+        if (err) {
+            res.clearCookie('jwt');
+            return res.redirect('/login');
+        }
+        req.user = user;
+        next();
+    });
+}
 
 serverAbou.get('/', (req, res) => {
-    req.session.user = "";
     res.sendFile(__dirname + '/Public/register.html');
 });
 
 serverAbou.get('/register', (req, res) => {
     res.sendFile(__dirname + '/Public/register.html');
-    req.session.user = "";
 });
 
 serverAbou.get('/errlogin', (req, res) => {
@@ -68,7 +74,8 @@ serverAbou.post('/register', async (req, res) => {
         }
 
         await controller.inserisciProfilo(nuovoProfilo.email, nuovoProfilo.password, nuovoProfilo.nominativo, nuovoProfilo.genere);
-        req.session.user = nuovoProfilo.email;
+        const token = jwt.sign({ email: nuovoProfilo.email }, secretKey, { expiresIn: '1h' });
+        res.cookie('jwt', token, { httpOnly: true, maxAge: 3600000 }); // 1 ora
         res.redirect('/sala');
     } catch (err) {
         console.error('Errore durante la registrazione:', err.message);
@@ -78,7 +85,6 @@ serverAbou.post('/register', async (req, res) => {
 
 serverAbou.get('/login', (req, res) => {
     res.sendFile(__dirname + '/Public/login.html');
-    req.session.user = "";
 });
 
 serverAbou.post('/login', async (req, res) => {
@@ -89,7 +95,8 @@ serverAbou.post('/login', async (req, res) => {
         const profilo = profili.find(profilo => profilo.email === email);
 
         if (profilo && profilo.password === password) {
-            req.session.user = email;
+            const token = jwt.sign({ email: email }, secretKey, { expiresIn: '1h' });
+            res.cookie('jwt', token, { httpOnly: true, maxAge: 3600000 }); // 1 ora
             res.redirect('/sala');
         } else {
             res.redirect('/errlogin');
@@ -102,7 +109,6 @@ serverAbou.post('/login', async (req, res) => {
 
 serverAbou.get('/napafini', (req, res) => {
     res.sendFile(__dirname + '/Public/adminLog.html');
-    req.session.user = "";
 });
 
 serverAbou.post('/adminLogin', async (req, res) => {
@@ -111,7 +117,8 @@ serverAbou.post('/adminLogin', async (req, res) => {
         const admin = await controller.cercaAmministratore(nome, password);
 
         if (admin) {
-            req.session.admin = admin.nome;
+            const token = jwt.sign({ admin: admin.nome }, secretKey, { expiresIn: '1h' });
+            res.cookie('jwt', token, { httpOnly: true, maxAge: 3600000 }); // 1 ora
             res.redirect('/sala');
         } else {
             res.status(401).send('Nome o password non validi');
@@ -122,13 +129,36 @@ serverAbou.post('/adminLogin', async (req, res) => {
     }
 });
 
-serverAbou.get('/sala', async (req, res) => {
+serverAbou.get('/adminReg', authenticateToken, async (req, res) => {
+    if (req.user.admin) {
+        res.sendFile(__dirname + '/Public/adminReg.html');
+    } else {
+        res.redirect('/sala');
+    }
+});
+
+serverAbou.post('/registerAdmin', authenticateToken, async (req, res) => {
+    if (!req.user.admin) {
+        return res.status(403).send('Non autorizzato');
+    }
+
+    try {
+        const { nome, password } = req.body;
+        await controller.registraAdmin(nome, password);
+        res.redirect('/sala');
+    } catch (err) {
+        console.error('Errore durante la registrazione admin:', err.message);
+        res.status(500).send('Errore durante la registrazione admin');
+    }
+});
+
+serverAbou.get('/sala', authenticateToken, async (req, res) => {
     try {
         let profilo;
-        if (req.session.user) {
-            profilo = (await controller.cercaProfiloEmail(req.session.user))[0];
-        } else if (req.session.admin) {
-            profilo = { nominativo: req.session.admin, isAdmin: true };
+        if (req.user.email) {
+            profilo = (await controller.cercaProfiloEmail(req.user.email))[0];
+        } else if (req.user.admin) {
+            profilo = { nominativo: req.user.admin, isAdmin: true };
         }
 
         if (!profilo) {
@@ -160,16 +190,16 @@ serverAbou.get('/sala', async (req, res) => {
     }
 });
 
-serverAbou.post('/prenota', async (req, res) => {
+serverAbou.post('/prenota', authenticateToken, async (req, res) => {
     try {
         let id_profilo;
         let nome_admin;
 
-        if (req.session.user) {
-            const profili = await controller.cercaProfiloEmail(req.session.user);
+        if (req.user.email) {
+            const profili = await controller.cercaProfiloEmail(req.user.email);
             id_profilo = profili[0].id;
-        } else if (req.session.admin) {
-            nome_admin = req.session.admin;
+        } else if (req.user.admin) {
+            nome_admin = req.user.admin;
         }
 
         const id_posto = req.body.id_posto;
@@ -187,18 +217,18 @@ serverAbou.post('/prenota', async (req, res) => {
     }
 });
 
-serverAbou.post('/eliminaPrenotazione', async (req, res) => {
+serverAbou.post('/eliminaPrenotazione', authenticateToken, async (req, res) => {
     try {
         const id_posto = req.body.id_posto;
         let profilo;
 
-        if (req.session.user) {
-            const profili = await controller.cercaProfiloEmail(req.session.user);
+        if (req.user.email) {
+            const profili = await controller.cercaProfiloEmail(req.user.email);
             profilo = profili[0];
-        } else if (req.session.admin) {
+        } else if (req.user.admin) {
             profilo = { isAdmin: true };
         }
-        const nome_admin = req.session.admin;
+        const nome_admin = req.user.admin;
         if (profilo.isAdmin) {
             await controller.eliminaPrenotazione(null, id_posto, nome_admin);
             res.redirect('/sala');
@@ -212,6 +242,12 @@ serverAbou.post('/eliminaPrenotazione', async (req, res) => {
         console.error('Errore durante l\'eliminazione della prenotazione:', err.message);
         res.status(500).send('Errore interno del server');
     }
+});
+
+// Aggiungi una route per il logout
+serverAbou.get('/logout', (req, res) => {
+    res.clearCookie('jwt');
+    res.redirect('/login');
 });
 
 // Middleware per gestire errore 404 (rotta non trovata)
