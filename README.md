@@ -1,5 +1,5 @@
 # Multisala Cinema
-
+*Nota: consiglio di vedere la versione di [Flask](https://github.com/MustafaRuby/multisala-moz-flask), poiché è l'evoluzione di questo*
 ## Descrizione
 Questo progetto è un'applicazione web per la gestione di una multisala cinematografica. Gli utenti possono registrarsi, effettuare il login e prenotare posti per le proiezioni.
 
